@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 description = "Copy a Rust project and obfuscate selected source files"
+readme = "README.md"
 
 [[bin]]
 name = "rustveil"

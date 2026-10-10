@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 description = "Opt-in local binding and string obfuscation macros for Rust"
+readme = "README.md"
 
 [features]
 default = []

@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 description = "Opt-in procedural macros for Rust source and string obfuscation"
+readme = "README.md"
 
 [lib]
 proc-macro = true

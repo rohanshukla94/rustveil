@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 description = "Syntax-based local variable renaming for Rust source"
+readme = "README.md"
 
 [dependencies]
 syn.workspace = true
