@@ -3,8 +3,22 @@
 Validated on Linux x86_64 with `rustc 1.99.0 (b940084d7 2026-09-28)`.
 The workspace declares Rust 1.88 because its locked CLI dependencies require it;
 the 1.88 toolchain itself was not tested. Use the included Cargo.lock for
-reproducible dependency selection. Windows, macOS, and no_std were not tested;
-the runtime string facility requires std.
+reproducible dependency selection. Windows validation is listed below. macOS
+and no_std were not tested; the runtime string facility requires std.
+
+## Windows validation
+
+Validated on Windows x86_64 with `rustc 1.95.0 (59807616e 2026-04-14)`.
+
+| Check | Result |
+| --- | --- |
+| `cargo test --workspace --all-features --locked` | 13 tests passed |
+| `cargo fmt --all -- --check` | Passed |
+| `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | Passed |
+| `cargo package --workspace --allow-dirty --no-verify` | All workspace packages assembled |
+| `cargo publish -p rustveil-core --dry-run --allow-dirty` | Archive verification passed; nothing uploaded |
+
+The Rust 1.88 toolchain was not tested.
 
 ## Completed checks
 
