@@ -1,0 +1,15 @@
+[package]
+name = "workspace-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[features]
+obfuscation = ["rv/enabled"]
+
+[dependencies]
+# Deliberately renamed to verify proc-macro crate-path resolution.
+rv = { package = "rustveil", version = "0.1.0", path = "../../crates/rustveil" }
+

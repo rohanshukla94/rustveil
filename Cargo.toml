@@ -1,0 +1,25 @@
+[workspace]
+members = ["crates/core", "crates/macros", "crates/rustveil", "crates/cli", "examples/workspace-app"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.88"
+repository = "https://github.com/rohanshukla94/rustveil"
+
+[workspace.dependencies]
+syn = { version = "2", features = ["full", "visit", "visit-mut", "extra-traits"] }
+quote = "1"
+proc-macro2 = "1"
+rustveil-core = { version = "0.1.0", path = "crates/core" }
+rustveil-macros = { version = "0.1.0", path = "crates/macros" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+debug = false
+

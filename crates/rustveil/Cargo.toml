@@ -1,0 +1,16 @@
+[package]
+name = "rustveil"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "Opt-in local binding and string obfuscation macros for Rust"
+
+[features]
+default = []
+enabled = ["rustveil-macros/enabled"]
+
+[dependencies]
+rustveil-macros.workspace = true
+
