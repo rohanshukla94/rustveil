@@ -1,0 +1,43 @@
+{
+  "format_version": 1,
+  "functions": 4,
+  "encoded_constants": 17,
+  "seed": "42",
+  "plain_object_bytes": 546,
+  "plain_executable_bytes": 144896,
+  "loads_after_o3": 17,
+  "encoded_object_bytes": 955,
+  "encoded_executable_bytes": 144896,
+  "samples_ns": {
+    "plain": [
+      3839000,
+      4177700,
+      4122300,
+      3824400,
+      3823500,
+      4106100,
+      3823500
+    ],
+    "encoded": [
+      4837800,
+      4989700,
+      5224600,
+      5269800,
+      4840200,
+      5880200,
+      4906100
+    ]
+  },
+  "median_runtime_ratio": 1.2997395154988278,
+  "checksum": "5069764184695745088",
+  "rustc": "rustc 1.88.0 (6b00bc388 2025-06-23)\nbinary: rustc\ncommit-hash: 6b00bc3880198600130e1cf62b8f8a93494488cc\ncommit-date: 2025-06-23\nhost: x86_64-pc-windows-msvc\nrelease: 1.88.0\nLLVM version: 20.1.5",
+  "llvm": "LLVM (http://llvm.org/):\n  LLVM version 20.1.8\n  Optimized build.\n  Default target: x86_64-pc-windows-msvc\n  Host CPU: skylake",
+  "checks_per_run": {
+    "u8_exhaustive": 256,
+    "u16_exhaustive": 65536,
+    "i32_edges": 7,
+    "u64_edges": 6,
+    "i32_generated": 100000,
+    "u64_generated": 100000
+  }
+}

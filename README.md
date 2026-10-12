@@ -5,6 +5,10 @@ opt-in Cargo macros. Source is included for every component. This is an initial
 implementation with regression tests, not a compiler-grade whole-program
 obfuscator or a guarantee against reverse engineering.
 
+The [LLVM constant experiment](experiments/llvm/README.md) is a separate prototype
+with optimization checks and runtime measurements. It is not included in the
+published crates.
+
 ## What it does
 
 | Component | Purpose |
