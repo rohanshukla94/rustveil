@@ -44,7 +44,7 @@ APIs, exported names, fields, and serialization contracts are not renamed.
    inspection results for each supported toolchain and target. Define repeatable
    reverse-engineering exercises before making comparative strength claims.
 
-Or-patterns, conditional let chains, and macro-expanded code require explicit
+Conditional let chains and macro-expanded code require explicit
 scope/expansion handling before they can enter the supported syntax set.
 Source comment/license preservation also needs a token-preserving rewrite mode;
 the current CLI regenerates selected changed files with prettyplease.

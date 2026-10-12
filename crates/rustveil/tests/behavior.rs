@@ -103,6 +103,41 @@ fn patterns_work_through_the_public_macro() {
     assert_eq!(patterns_and_guards(None), 14);
 }
 
+#[obfuscate(require_renames, assume_bindings)]
+fn alternatives(input: Result<Point, Point>) -> i32 {
+    let x = 100;
+    let result = match input {
+        Ok(Point { x, y }) | Err(Point { x, y }) if x > y => x - y,
+        Ok(Point { x, .. }) | Err(Point { x, .. }) => x,
+    };
+    result + x
+}
+
+#[obfuscate(require_renames)]
+fn nested_alternatives(input: Option<Result<i32, i32>>) -> i32 {
+    match input {
+        Some(Ok(ref n) | Err(ref n)) if *n > 0 => *n,
+        Some(Ok(n @ -10..=0) | Err(n @ -10..=0)) => -n,
+        _ => 0,
+    }
+}
+
+#[test]
+fn or_patterns_preserve_guards_and_outer_bindings() {
+    for input in [Ok(Point { x: 7, y: 2 }), Err(Point { x: 7, y: 2 })] {
+        assert_eq!(alternatives(input), 105);
+    }
+    for input in [Ok(Point { x: 2, y: 7 }), Err(Point { x: 2, y: 7 })] {
+        assert_eq!(alternatives(input), 102);
+    }
+    for n in -12_i32..=12 {
+        let expected = if n >= -10 { n.abs() } else { 0 };
+        assert_eq!(nested_alternatives(Some(Ok(n))), expected);
+        assert_eq!(nested_alternatives(Some(Err(n))), expected);
+    }
+    assert_eq!(nested_alternatives(None), 0);
+}
+
 #[test]
 fn behavior_matches_original() {
     assert_eq!(shadow(2), 12);

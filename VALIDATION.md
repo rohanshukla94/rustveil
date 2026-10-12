@@ -21,16 +21,11 @@ Release 0.1.0, checked on 2026-10-12 on Windows x86_64.
 | Fresh registry-only consumer with dependency alias `rv` | Both release modes printed `registry-ok:7` |
 | Published CLI installation into a temporary workspace prefix | Version and help checks passed, including both coverage flags |
 
-The published source is commit `af9cc38`, tagged locally as `v0.1.0`.
-The GitHub push requires separate authorization; registry publication completed.
+The published source is commit `af9cc38`, tagged `v0.1.0` on GitHub.
 
 Commands are in CONTRIBUTING.md. Compiler versions were rustc 1.95.0
 (59807616e 2026-04-14) and rustc 1.88.0 (6b00bc388 2025-06-23).
 The release-artifact check uses the renamed `rv` dependency in workspace-app.
-
-The compiler diagnostic tests invoke Cargo and rustc subprocesses. The minimum
-Rust run initially exposed extra cascading errors in old rustc diagnostics;
-fixtures now isolate the macro error and pass unchanged on both compilers.
 
 ## Behavior covered
 

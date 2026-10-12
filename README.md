@@ -17,8 +17,8 @@ obfuscator or a guarantee against reverse engineering.
 
 Local renaming handles nested blocks, shadowing, initializer scope, assignments,
 closure and loop bindings, tuple/struct/slice/reference destructuring, `@`
-bindings, `let-else`, and match arms with guards. Struct field names are preserved
-in both expressions and patterns by expanding shorthand when needed. It
+bindings, or-patterns, `let-else`, and match arms with guards. Struct field names
+are preserved in expressions and patterns by expanding shorthand when needed. It
 preserves function names, function parameters, type names, struct field names,
 lifetimes, public interfaces, and serialization names. Identifier seeds are
 deterministic; they are not secrets.
@@ -36,7 +36,7 @@ There are two binding modes:
 
 Rust allows `let Unit = value;` to be a pattern, rather than a variable binding.
 A syntax parser cannot fully resolve that distinction. Both modes skip entire
-functions containing macros, or-patterns, conditional let patterns,
+functions containing macros, conditional let patterns,
 nested items, const patterns, inline const blocks, or body/signature
 attributes. The CLI also skips attributed functions, modules, impls, traits,
 and files. This includes harmless documentation and lint attributes: coverage

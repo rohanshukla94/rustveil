@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Rename shared bindings in or-patterns, including nested alternatives and
+  struct shorthand. Each binding is counted once across alternatives.
+
 ## 0.1.0 - 2026-10-12
 
 First crates.io release.

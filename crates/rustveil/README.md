@@ -37,8 +37,8 @@ enabled but a function is skipped or no bindings are renamed. `strict` rejects
 skipped functions only. Options are validated even with obfuscation disabled;
 duplicate options are rejected.
 
-Tuple, struct, slice, reference, and `@` patterns and match guards are supported.
+Tuple, struct, slice, reference, `@`, and or-patterns and match guards are supported.
 In `assume_bindings` mode, bare identifier patterns must be variable bindings.
 Qualify constants and unit variants, for example `crate::LIMIT` and
-`Option::None`, to keep their meaning. Macros, or-patterns, conditional let
+`Option::None`, to keep their meaning. Macros, conditional let
 patterns, nested items, const blocks/patterns, and attributes are skipped.

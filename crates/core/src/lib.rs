@@ -62,8 +62,8 @@ impl<'ast> Visit<'ast> for Guard {
             | Pat::Rest(_)
             | Pat::Lit(_)
             | Pat::Path(_)
-            | Pat::Range(_) => {}
-            Pat::Or(_) => self.reject("or-patterns require shared binding identities"),
+            | Pat::Range(_)
+            | Pat::Or(_) => {}
             Pat::Const(_) => self.reject("const patterns have a separate name environment"),
             _ => self.reject("unsupported pattern syntax"),
         }
@@ -106,10 +106,24 @@ impl Renamer {
             .find_map(|s| s.get(key.trim_start_matches("r#")).cloned())
     }
     fn bind(&mut self, pat: &mut Pat) {
+        self.bind_pattern(pat, &mut HashMap::new());
+    }
+
+    fn bind_pattern(&mut self, pat: &mut Pat, bindings: &mut HashMap<String, Ident>) {
         match pat {
             Pat::Ident(p) => {
                 let old = p.ident.to_string();
                 let old = old.trim_start_matches("r#");
+                // Alternatives in an or-pattern introduce the same bindings.
+                if let Some(new) = bindings.get(old) {
+                    let span = p.ident.span();
+                    p.ident = new.clone();
+                    p.ident.set_span(span);
+                    if let Some((_, subpat)) = &mut p.subpat {
+                        self.bind_pattern(subpat, bindings);
+                    }
+                    return;
+                }
                 // A bare identifier pattern can name a unit struct or a constant.
                 // Explicit mut/ref/@ bindings, or shadowing of a known renamed
                 // binding, are unambiguous without compiler name resolution.
@@ -120,6 +134,7 @@ impl Renamer {
                     && p.subpat.is_none()
                     && !known
                 {
+                    bindings.insert(old.into(), p.ident.clone());
                     self.scopes
                         .last_mut()
                         .unwrap()
@@ -139,6 +154,7 @@ impl Renamer {
                     }
                 };
                 let new = Ident::new(&candidate, p.ident.span());
+                bindings.insert(old.into(), new.clone());
                 self.scopes
                     .last_mut()
                     .unwrap()
@@ -146,21 +162,43 @@ impl Renamer {
                 p.ident = new;
                 self.renamed += 1;
                 if let Some((_, subpat)) = &mut p.subpat {
-                    self.bind(subpat);
+                    self.bind_pattern(subpat, bindings);
                 }
             }
-            Pat::Type(p) => self.bind(&mut p.pat),
-            Pat::Reference(p) => self.bind(&mut p.pat),
-            Pat::Paren(p) => self.bind(&mut p.pat),
-            Pat::Tuple(p) => p.elems.iter_mut().for_each(|p| self.bind(p)),
-            Pat::TupleStruct(p) => p.elems.iter_mut().for_each(|p| self.bind(p)),
-            Pat::Slice(p) => p.elems.iter_mut().for_each(|p| self.bind(p)),
+            Pat::Type(p) => self.bind_pattern(&mut p.pat, bindings),
+            Pat::Reference(p) => self.bind_pattern(&mut p.pat, bindings),
+            Pat::Paren(p) => self.bind_pattern(&mut p.pat, bindings),
+            Pat::Tuple(p) => {
+                for pat in &mut p.elems {
+                    self.bind_pattern(pat, bindings);
+                }
+            }
+            Pat::TupleStruct(p) => {
+                for pat in &mut p.elems {
+                    self.bind_pattern(pat, bindings);
+                }
+            }
+            Pat::Slice(p) => {
+                for pat in &mut p.elems {
+                    self.bind_pattern(pat, bindings);
+                }
+            }
+            Pat::Or(p) => {
+                for pat in &mut p.cases {
+                    self.bind_pattern(pat, bindings);
+                }
+            }
             Pat::Struct(p) => {
                 for field in &mut p.fields {
-                    let before = self.renamed;
-                    self.bind(&mut field.pat);
-                    if field.colon_token.is_none() && self.renamed != before {
-                        field.colon_token = Some(Default::default());
+                    self.bind_pattern(&mut field.pat, bindings);
+                    if field.colon_token.is_none() {
+                        if let (Member::Named(name), Pat::Ident(binding)) =
+                            (&field.member, &*field.pat)
+                        {
+                            if *name != binding.ident {
+                                field.colon_token = Some(Default::default());
+                            }
+                        }
                     }
                 }
             }
@@ -314,7 +352,6 @@ mod tests {
     fn unsafe_syntax_is_unchanged() {
         for source in [
             "fn f() { let x = 1; println!(\"{x}\"); }",
-            "fn f(x: Option<i32>) { match x { Some(a) | Some(a) => (), _ => () } }",
             "fn f(x: Option<i32>) { if let Some(a) = x {} }",
             "fn f(x: i32) { match x { const { 1 } => (), _ => () } }",
             "fn f() { let x = 1; const A: i32 = 2; }",
@@ -388,6 +425,77 @@ mod tests {
         let out = transform(&f.sig, &mut f.block, 1);
         assert_eq!(out.renamed, 1);
         assert!(out.skipped.is_none());
+    }
+    #[test]
+    fn or_patterns_share_names_and_count_each_binding_once() {
+        let (f, out) = run(r#"
+            fn f(input: Result<Point, Point>) -> i32 {
+                match input {
+                    Ok(Point { x, y }) | Err(Point { x, y }) => x + y,
+                }
+            }
+        "#);
+        assert_eq!(out.renamed, 2);
+        assert!(out.skipped.is_none());
+        let Stmt::Expr(Expr::Match(expr), _) = &f.block.stmts[0] else {
+            panic!("expected match expression");
+        };
+        let Pat::Or(pattern) = &expr.arms[0].pat else {
+            panic!("expected or-pattern");
+        };
+        let fields: Vec<_> = pattern
+            .cases
+            .iter()
+            .map(|case| {
+                let Pat::TupleStruct(case) = case else {
+                    panic!("expected variant")
+                };
+                let Pat::Struct(point) = &case.elems[0] else {
+                    panic!("expected struct")
+                };
+                point
+                    .fields
+                    .iter()
+                    .map(|field| {
+                        assert!(field.colon_token.is_some());
+                        field.pat.to_token_stream().to_string()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        assert_eq!(fields[0], fields[1]);
+    }
+
+    #[test]
+    fn default_mode_keeps_constant_alternatives() {
+        let mut f: ItemFn = syn::parse_quote! {
+            fn f(input: i32) -> i32 {
+                match input {
+                    LOW | HIGH => 1,
+                    mut n => { n += 1; n }
+                }
+            }
+        };
+        let out = transform(&f.sig, &mut f.block, 1);
+        assert_eq!(out.renamed, 1);
+        assert!(out.skipped.is_none());
+        assert!(f.to_token_stream().to_string().contains("LOW | HIGH => 1"));
+    }
+
+    #[test]
+    fn unrenamed_raw_identifiers_survive_repeated_alternatives() {
+        let mut f: ItemFn = syn::parse_quote! {
+            fn f(input: Result<i32, i32>) -> i32 {
+                match input {
+                    Ok(r#type) | Err(r#type) => r#type,
+                }
+            }
+        };
+        let before = f.clone();
+        let out = transform(&f.sig, &mut f.block, 1);
+        assert_eq!(out.renamed, 0);
+        assert!(out.skipped.is_none());
+        assert_eq!(f, before);
     }
     #[test]
     fn pattern_attributes_reject_the_whole_function_without_edits() {

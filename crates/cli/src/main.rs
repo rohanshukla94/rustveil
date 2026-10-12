@@ -539,7 +539,7 @@ fn evaluate(input: Option<i32>) -> i32 {
     for (x, y) in [(1, 2), (3, 4)] { sum += f((x, y)); }
     let matched = match input {
         Option::Some(x) if x > 10 => x + 100,
-        Option::Some(x @ 0..=10) => x + 200,
+        Option::Some(x @ 0..=10) | Option::Some(x @ 90..=100) => x + 200,
         Option::Some(ref x) => *x - 100,
         Option::None => x,
     };

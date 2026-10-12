@@ -26,5 +26,6 @@ Without that feature, both coverage checks are disabled.
 
 Destructuring and match arms with guards are supported. In `assume_bindings`
 mode, all bare identifier patterns must be bindings: qualify constants and
-unit variants (write `Option::None`, not `None`). Or-patterns, conditional let
-patterns, nested items, macros, and attributes remain conservatively skipped.
+unit variants (write `Option::None`, not `None`). Or-pattern alternatives share
+one renamed binding per name. Conditional let patterns, nested items, macros,
+and attributes remain conservatively skipped.
