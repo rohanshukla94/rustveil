@@ -1,6 +1,6 @@
 # Validation record
 
-Release candidate 0.1.0, checked on 2026-10-12 on Windows x86_64.
+Release 0.1.0, checked on 2026-10-12 on Windows x86_64.
 
 ## Locally completed checks
 
@@ -16,6 +16,13 @@ Release candidate 0.1.0, checked on 2026-10-12 on Windows x86_64.
 | Release artifact comparison, Rust 1.95.0 | Identical runtime output with feature off/on |
 | Plaintext marker in plain release binary | Present; binary 125,952 bytes |
 | Plaintext marker in encoded release binary | Absent; binary 129,536 bytes |
+| Per-crate publish dry runs | All four archives verified, with MIT license files |
+| crates.io publication | core, macros, facade, and CLI 0.1.0 published and available |
+| Fresh registry-only consumer with dependency alias `rv` | Both release modes printed `registry-ok:7` |
+| Published CLI installation into a temporary workspace prefix | Version and help checks passed, including both coverage flags |
+
+The published source is commit `af9cc38`, tagged locally as `v0.1.0`.
+The GitHub push requires separate authorization; registry publication completed.
 
 Commands are in CONTRIBUTING.md. Compiler versions were rustc 1.95.0
 (59807616e 2026-04-14) and rustc 1.88.0 (6b00bc388 2025-06-23).
