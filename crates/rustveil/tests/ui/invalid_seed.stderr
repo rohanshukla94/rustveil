@@ -1,0 +1,5 @@
+error: seed must be a u64 integer literal
+ --> tests/ui/invalid_seed.rs:3:13
+  |
+3 | #[obfuscate(seed = "secret")]
+  |             ^^^^^^^^^^^^^^^

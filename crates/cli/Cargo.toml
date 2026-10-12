@@ -5,12 +5,15 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
+keywords.workspace = true
+categories = ["command-line-utilities", "development-tools"]
 description = "Copy a Rust project and obfuscate selected source files"
 readme = "README.md"
 
 [[bin]]
 name = "rustveil"
 path = "src/main.rs"
+doc = false
 
 [dependencies]
 rustveil-core.workspace = true

@@ -1,5 +1,4 @@
-//! Opt-in local-binding and runtime string obfuscation.
-//! Enable the `enabled` Cargo feature in your selected production build.
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 extern crate self as rustveil;
 pub use rustveil_macros::{obfuscate, veil_str};

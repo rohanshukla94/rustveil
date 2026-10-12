@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
@@ -7,43 +9,64 @@ use syn::{
     ItemFn, LitInt, LitStr, Meta, Token,
 };
 
-/// Rename local bindings. Unsupported syntax passes through unless `strict` is set.
-#[proc_macro_attribute]
-pub fn obfuscate(args: TokenStream, input: TokenStream) -> TokenStream {
-    let args = parse_macro_input!(args with Punctuated::<Meta, Token![,]>::parse_terminated);
-    let mut seed = 0u64;
-    let mut strict = false;
-    let mut assume_bindings = false;
-    for arg in args {
-        match arg {
-            Meta::Path(p) if p.is_ident("strict") => strict = true,
-            Meta::Path(p) if p.is_ident("assume_bindings") => assume_bindings = true,
-            Meta::NameValue(m) if m.path.is_ident("seed") => {
-                if let syn::Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Int(n),
-                    ..
-                }) = &m.value
-                {
-                    match n.base10_parse::<u64>() {
-                        Ok(n) => seed = n,
-                        Err(e) => return e.to_compile_error().into(),
-                    }
-                } else {
-                    return syn::Error::new_spanned(m, "seed must be a u64 integer literal")
-                        .to_compile_error()
-                        .into();
+#[derive(Default)]
+struct Options {
+    seed: u64,
+    strict: bool,
+    assume_bindings: bool,
+    require_renames: bool,
+}
+impl Parse for Options {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let args = Punctuated::<Meta, Token![,]>::parse_terminated(input)?;
+        let mut options = Self::default();
+        let mut seen = std::collections::HashSet::new();
+        for arg in args {
+            if let Some(name) = arg.path().get_ident() {
+                if !seen.insert(name.to_string()) {
+                    return Err(syn::Error::new_spanned(&arg, "duplicate obfuscate option"));
                 }
             }
-            other => {
-                return syn::Error::new_spanned(
-                    other,
-                    "expected seed = <u64>, strict, or assume_bindings",
-                )
-                .to_compile_error()
-                .into()
+            match arg {
+                Meta::Path(p) if p.is_ident("strict") => options.strict = true,
+                Meta::Path(p) if p.is_ident("assume_bindings") => options.assume_bindings = true,
+                Meta::Path(p) if p.is_ident("require_renames") => options.require_renames = true,
+                Meta::NameValue(m) if m.path.is_ident("seed") => {
+                    if let syn::Expr::Lit(syn::ExprLit {
+                        lit: syn::Lit::Int(n),
+                        ..
+                    }) = &m.value
+                    {
+                        options.seed = n.base10_parse::<u64>()?;
+                    } else {
+                        return Err(syn::Error::new_spanned(
+                            m,
+                            "seed must be a u64 integer literal",
+                        ));
+                    }
+                }
+                other => {
+                    return Err(syn::Error::new_spanned(
+                        other,
+                        "expected seed = <u64>, strict, assume_bindings, or require_renames",
+                    ));
+                }
             }
         }
+        Ok(options)
     }
+}
+
+/// Rename local bindings. `strict` rejects unsupported syntax;
+/// `require_renames` also rejects functions with zero renamed bindings.
+#[proc_macro_attribute]
+pub fn obfuscate(args: TokenStream, input: TokenStream) -> TokenStream {
+    let Options {
+        seed,
+        strict,
+        assume_bindings,
+        require_renames,
+    } = parse_macro_input!(args as Options);
     if !cfg!(feature = "enabled") {
         return input;
     }
@@ -58,7 +81,7 @@ pub fn obfuscate(args: TokenStream, input: TokenStream) -> TokenStream {
     } else {
         rustveil_core::Outcome { renamed: 0, skipped: Some("other function attributes require explicit review; use an unannotated helper function".into()) }
     };
-    if strict {
+    if strict || require_renames {
         if let Some(reason) = result.skipped {
             return syn::Error::new_spanned(
                 &function.sig,
@@ -67,6 +90,14 @@ pub fn obfuscate(args: TokenStream, input: TokenStream) -> TokenStream {
             .to_compile_error()
             .into();
         }
+    }
+    if require_renames && result.renamed == 0 {
+        return syn::Error::new_spanned(
+            &function.sig,
+            "rustveil renamed no bindings; require_renames needs at least one eligible binding",
+        )
+        .to_compile_error()
+        .into();
     }
     quote!(#function).into()
 }
@@ -131,4 +162,30 @@ pub fn veil_str(input: TokenStream) -> TokenStream {
         VALUE.get_or_init(|| #runtime::__private::decode(&[#(#bytes),*], #seed)).as_str()
     })
     .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn options_reject_duplicates_and_invalid_seeds() {
+        for input in [
+            "strict, strict",
+            "seed = 1, seed = 2",
+            "assume_bindings, assume_bindings",
+            "require_renames, require_renames",
+            "seed = -1",
+            "seed = 18446744073709551616",
+            "seed = \"one\"",
+            "unknown",
+        ] {
+            assert!(syn::parse_str::<Options>(input).is_err(), "{input}");
+        }
+        let options =
+            syn::parse_str::<Options>("seed = 0xff, strict, assume_bindings, require_renames,")
+                .unwrap();
+        assert_eq!(options.seed, 255);
+        assert!(options.strict && options.assume_bindings && options.require_renames);
+    }
 }

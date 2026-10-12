@@ -5,6 +5,8 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "Opt-in local binding and string obfuscation macros for Rust"
 readme = "README.md"
 
@@ -14,4 +16,10 @@ enabled = ["rustveil-macros/enabled"]
 
 [dependencies]
 rustveil-macros.workspace = true
+
+[dev-dependencies]
+trybuild = "1"
+
+[package.metadata.docs.rs]
+all-features = true
 

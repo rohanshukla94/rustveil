@@ -83,6 +83,26 @@ impl Point {
     }
 }
 
+#[obfuscate(require_renames, assume_bindings)]
+fn patterns_and_guards(input: Option<Point>) -> i32 {
+    let fallback = 7;
+    let result = match input {
+        Option::Some(Point { x, y }) if x > y => x - y,
+        Option::Some(Point { x: n @ 0..=10, y }) => n + y,
+        Option::Some(Point { x, .. }) => x,
+        Option::None => fallback,
+    };
+    result + fallback
+}
+
+#[test]
+fn patterns_work_through_the_public_macro() {
+    assert_eq!(patterns_and_guards(Some(Point { x: 8, y: 3 })), 12);
+    assert_eq!(patterns_and_guards(Some(Point { x: 2, y: 3 })), 12);
+    assert_eq!(patterns_and_guards(Some(Point { x: -3, y: 3 })), 4);
+    assert_eq!(patterns_and_guards(None), 14);
+}
+
 #[test]
 fn behavior_matches_original() {
     assert_eq!(shadow(2), 12);

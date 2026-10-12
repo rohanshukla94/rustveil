@@ -8,6 +8,8 @@ edition = "2021"
 license = "MIT"
 rust-version = "1.88"
 repository = "https://github.com/rohanshukla94/rustveil"
+keywords = ["obfuscation", "obfuscator", "macros", "source-transform"]
+categories = ["development-tools"]
 
 [workspace.dependencies]
 syn = { version = "2", features = ["full", "visit", "visit-mut", "extra-traits"] }

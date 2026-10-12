@@ -1,55 +1,54 @@
 # Validation record
 
-Validated on Linux x86_64 with `rustc 1.99.0 (b940084d7 2026-09-28)`.
-The workspace declares Rust 1.88 because its locked CLI dependencies require it;
-the 1.88 toolchain itself was not tested. Use the included Cargo.lock for
-reproducible dependency selection. Windows validation is listed below. macOS
-and no_std were not tested; the runtime string facility requires std.
+Release candidate 0.1.0, checked on 2026-10-12 on Windows x86_64.
 
-## Windows validation
-
-Validated on Windows x86_64 with `rustc 1.95.0 (59807616e 2026-04-14)`.
+## Locally completed checks
 
 | Check | Result |
 | --- | --- |
-| `cargo test --workspace --all-features --locked` | 13 tests passed |
-| `cargo fmt --all -- --check` | Passed |
-| `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | Passed |
-| `cargo package --workspace --allow-dirty --no-verify` | All workspace packages assembled |
-| `cargo publish -p rustveil-core --dry-run --allow-dirty` | Archive verification passed; nothing uploaded |
+| Rust 1.95.0, default workspace tests | 22 tests + 1 doctest passed |
+| Rust 1.95.0, all-features workspace tests | 22 tests + 1 doctest passed |
+| Rust 1.88.0, all-features workspace tests | 22 tests + 1 doctest passed |
+| Four compiler diagnostic fixtures | Expected failures with enabled; coverage fixtures pass when disabled |
+| Formatting and Clippy with warnings denied | Passed |
+| Documentation with rustdoc warnings denied | Passed |
+| Workspace package verification | All package archives built successfully |
+| Release artifact comparison, Rust 1.95.0 | Identical runtime output with feature off/on |
+| Plaintext marker in plain release binary | Present; binary 125,952 bytes |
+| Plaintext marker in encoded release binary | Absent; binary 129,536 bytes |
 
-The Rust 1.88 toolchain was not tested.
+Commands are in CONTRIBUTING.md. Compiler versions were rustc 1.95.0
+(59807616e 2026-04-14) and rustc 1.88.0 (6b00bc388 2025-06-23).
+The release-artifact check uses the renamed `rv` dependency in workspace-app.
 
-## Completed checks
-
-| Check | Result |
-| --- | --- |
-| `cargo test --workspace --locked` | 14 tests passed |
-| `cargo test --workspace --all-features --locked` | 14 tests passed |
-| `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | Passed |
-| `cargo fmt --all` | Source formatted |
-| Release example with the obfuscation feature enabled | Ran successfully; output was `RustVeil workspace demo — ready: 1710` |
-| Separate Cargo consumer using dependency alias `rv` | Enabled/disabled builds produced identical output |
-| Strict attribute on a function containing a macro | Rejected with the expected compiler error |
+The compiler diagnostic tests invoke Cargo and rustc subprocesses. The minimum
+Rust run initially exposed extra cascading errors in old rustc diagnostics;
+fixtures now isolate the macro error and pass unchanged on both compilers.
 
 ## Behavior covered
 
-* Local shadowing and initializer evaluation under the previous binding.
-* Nested block scopes, simple closures, loop scopes, mutable references,
-  delayed initialization, raw identifiers, methods, and const functions.
-* Preservation of struct field labels when a shorthand expression is renamed.
-* Macro passthrough and rejection of unsupported syntax without partial edits.
-* Deterministic seeds and conservative treatment of ambiguous unit patterns.
-* Unicode, NUL bytes, raw/empty strings, static lifetime, and concurrent cache access.
-* Project copying, selection globs, dry-run, exclusions, output-path checks,
-  symlink rejection, parse-error cleanup, and source preservation.
-* Compiling both the original and transformed project fixtures and comparing
-  their runtime output in both binding modes.
+- Nested scopes, shadowing, initializer scope, delayed initialization, closures,
+  loops, mutable references, raw identifiers, methods, and const functions.
+- Tuple, struct, tuple-struct, slice/rest, reference and @ bindings; match guards,
+  arm-local shadowing, failed guards, and restoration of outer bindings.
+- let-else fallback scope and struct shorthand field-name preservation.
+- Conservative treatment of bare variants/constants and rejection without
+  partial changes for unsupported syntax and pattern attributes.
+- Determinism, feature passthrough, duplicate-option/invalid-seed diagnostics,
+  and require_renames failures for skipped or unchanged functions.
+- UTF-8, NUL, empty/raw strings, static lifetime, and concurrent cache access.
+- Copy selection, exclusions, dry run, coverage requirements, path checks,
+  parse-error cleanup, staging cleanup, and source preservation.
+- Compilation and execution of original/transformed fixtures in both binding modes.
 
-## Scope of these results
+## Scope of the evidence
 
-The tests validate the bundled fixtures and an external consumer. They do not
-establish compatibility with an arbitrary large workspace. Run your own test
-suite, feature matrix, and target builds before shipping transformed output.
-The CLI is syntax-based and does not invoke rustc for name resolution or prove
-semantic equivalence. It does not itself run or execute the project being copied.
+The CI matrix is configured for Linux, Windows, and macOS on Rust 1.88 and
+stable. Linux/macOS runs of this revision have not been observed locally;
+configuration alone is not a validation result. Unix symlink tests run only
+on Unix. no_std is unsupported by the runtime string facility.
+
+Marker absence is a regression check for this example, target, and compiler,
+not proof that all plaintext is hidden or that analysis cannot recover it.
+Tests cover the bundled fixtures, not arbitrary workspaces. The transformer
+has no compiler name resolution or general semantic-equivalence proof.

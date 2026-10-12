@@ -1,0 +1,5 @@
+error: rustveil renamed no bindings; require_renames needs at least one eligible binding
+ --> tests/ui/no_renames.rs:4:1
+  |
+4 | fn unchanged(value: i32) -> i32 { value + 1 }
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -21,15 +21,6 @@ pub fn hash(bytes: &[u8], seed: u64) -> u64 {
     })
 }
 
-fn simple(p: &Pat) -> bool {
-    match p {
-        Pat::Ident(p) => p.subpat.is_none() && p.attrs.is_empty(),
-        Pat::Type(p) => p.attrs.is_empty() && simple(&p.pat),
-        Pat::Wild(p) => p.attrs.is_empty(),
-        _ => false,
-    }
-}
-
 #[derive(Default)]
 struct Guard {
     reason: Option<String>,
@@ -51,9 +42,6 @@ impl<'ast> Visit<'ast> for Guard {
     fn visit_item(&mut self, _: &'ast Item) {
         self.reject("nested items may introduce names");
     }
-    fn visit_expr_match(&mut self, _: &'ast ExprMatch) {
-        self.reject("match patterns require name resolution");
-    }
     fn visit_expr_let(&mut self, _: &'ast ExprLet) {
         self.reject("let chains and conditional patterns require name resolution");
     }
@@ -61,8 +49,23 @@ impl<'ast> Visit<'ast> for Guard {
         self.reject("inline const blocks have a separate name environment");
     }
     fn visit_pat(&mut self, p: &'ast Pat) {
-        if !simple(p) {
-            self.reject("destructuring patterns require name resolution");
+        match p {
+            Pat::Ident(_)
+            | Pat::Type(_)
+            | Pat::Wild(_)
+            | Pat::Tuple(_)
+            | Pat::TupleStruct(_)
+            | Pat::Struct(_)
+            | Pat::Slice(_)
+            | Pat::Reference(_)
+            | Pat::Paren(_)
+            | Pat::Rest(_)
+            | Pat::Lit(_)
+            | Pat::Path(_)
+            | Pat::Range(_) => {}
+            Pat::Or(_) => self.reject("or-patterns require shared binding identities"),
+            Pat::Const(_) => self.reject("const patterns have a separate name environment"),
+            _ => self.reject("unsupported pattern syntax"),
         }
         visit::visit_pat(self, p);
     }
@@ -108,10 +111,15 @@ impl Renamer {
                 let old = p.ident.to_string();
                 let old = old.trim_start_matches("r#");
                 // A bare identifier pattern can name a unit struct or a constant.
-                // Only explicit mut/ref bindings, or shadowing of a known renamed
+                // Explicit mut/ref/@ bindings, or shadowing of a known renamed
                 // binding, are unambiguous without compiler name resolution.
                 let known = self.lookup(&p.ident).is_some_and(|id| id != p.ident);
-                if !self.assume_bindings && p.mutability.is_none() && p.by_ref.is_none() && !known {
+                if !self.assume_bindings
+                    && p.mutability.is_none()
+                    && p.by_ref.is_none()
+                    && p.subpat.is_none()
+                    && !known
+                {
                     self.scopes
                         .last_mut()
                         .unwrap()
@@ -137,10 +145,27 @@ impl Renamer {
                     .insert(old.into(), new.clone());
                 p.ident = new;
                 self.renamed += 1;
+                if let Some((_, subpat)) = &mut p.subpat {
+                    self.bind(subpat);
+                }
             }
             Pat::Type(p) => self.bind(&mut p.pat),
-            Pat::Wild(_) => {}
-            _ => unreachable!("guard rejected non-simple patterns"),
+            Pat::Reference(p) => self.bind(&mut p.pat),
+            Pat::Paren(p) => self.bind(&mut p.pat),
+            Pat::Tuple(p) => p.elems.iter_mut().for_each(|p| self.bind(p)),
+            Pat::TupleStruct(p) => p.elems.iter_mut().for_each(|p| self.bind(p)),
+            Pat::Slice(p) => p.elems.iter_mut().for_each(|p| self.bind(p)),
+            Pat::Struct(p) => {
+                for field in &mut p.fields {
+                    let before = self.renamed;
+                    self.bind(&mut field.pat);
+                    if field.colon_token.is_none() && self.renamed != before {
+                        field.colon_token = Some(Default::default());
+                    }
+                }
+            }
+            Pat::Wild(_) | Pat::Rest(_) | Pat::Lit(_) | Pat::Path(_) | Pat::Range(_) => {}
+            _ => unreachable!("guard rejected unsupported patterns"),
         }
     }
 }
@@ -198,6 +223,20 @@ impl VisitMut for Renamer {
         self.visit_block_mut(&mut expr.body);
         self.scopes.pop();
     }
+    fn visit_expr_match_mut(&mut self, expr: &mut ExprMatch) {
+        // The scrutinee sees the outer scope. Each arm's bindings are visible
+        // in its guard and body, but never in another arm or after the match.
+        self.visit_expr_mut(&mut expr.expr);
+        for arm in &mut expr.arms {
+            self.scopes.push(HashMap::new());
+            self.bind(&mut arm.pat);
+            if let Some((_, guard)) = &mut arm.guard {
+                self.visit_expr_mut(guard);
+            }
+            self.visit_expr_mut(&mut arm.body);
+            self.scopes.pop();
+        }
+    }
     fn visit_expr_closure_mut(&mut self, expr: &mut ExprClosure) {
         // Parameter types and return type are resolved outside the value bindings.
         for pat in &mut expr.inputs {
@@ -219,8 +258,9 @@ pub fn transform(sig: &Signature, body: &mut Block, seed: u64) -> Outcome {
     transform_with_options(sig, body, seed, false)
 }
 
-/// `assume_bindings` asserts that every simple pattern in the function is a
-/// variable binding, not a constant or unit-struct pattern. Review before use.
+/// `assume_bindings` asserts that every bare identifier pattern in the function
+/// is a variable binding, not a constant, unit struct, or enum variant. Qualify
+/// constant/variant paths (e.g. `Option::None`) in reviewed code before use.
 pub fn transform_with_options(
     sig: &Signature,
     body: &mut Block,
@@ -274,9 +314,9 @@ mod tests {
     fn unsafe_syntax_is_unchanged() {
         for source in [
             "fn f() { let x = 1; println!(\"{x}\"); }",
-            "fn f() { let (a, b) = (1, 2); }",
+            "fn f(x: Option<i32>) { match x { Some(a) | Some(a) => (), _ => () } }",
             "fn f(x: Option<i32>) { if let Some(a) = x {} }",
-            "fn f(x: i32) { match x { 1 => (), _ => () } }",
+            "fn f(x: i32) { match x { const { 1 } => (), _ => () } }",
             "fn f() { let x = 1; const A: i32 = 2; }",
             "fn f() { #[allow(unused)] let x = 1; }",
         ] {
@@ -314,5 +354,48 @@ mod tests {
         let mut f: ItemFn =
             syn::parse_str("fn f() -> i32 { let mut x = 2; x += 1; let x = x + 2; x }").unwrap();
         assert_eq!(transform(&f.sig, &mut f.block, 1).renamed, 2);
+    }
+    #[test]
+    fn nested_patterns_preserve_field_names_and_binding_modes() {
+        let (f, out) =
+            run("fn f(p: Point) { let Point { x: (ref a, mut b), ref y } = p; b += *a + *y; }");
+        assert_eq!(out.renamed, 3);
+        assert!(out.skipped.is_none());
+        let text = f.to_token_stream().to_string();
+        assert!(text.contains("x : (ref rv_"), "{text}");
+        assert!(text.contains("y : ref rv_"), "{text}");
+        syn::parse2::<ItemFn>(f.to_token_stream()).unwrap();
+    }
+    #[test]
+    fn default_preserves_bare_variants_and_constants_in_matches() {
+        let mut f: ItemFn = syn::parse_str("fn f(value: Option<i32>) -> i32 { match value { Some(mut n) => { n += 1; n }, None => 0 } }").unwrap();
+        let out = transform(&f.sig, &mut f.block, 1);
+        assert_eq!(out.renamed, 1);
+        assert!(out.skipped.is_none());
+        assert!(f.to_token_stream().to_string().contains("None => 0"));
+        let mut f: ItemFn =
+            syn::parse_str("fn f(value: i32) -> i32 { match value { LIMIT => 1, _ => 0 } }")
+                .unwrap();
+        let before = f.clone();
+        assert_eq!(transform(&f.sig, &mut f.block, 1).renamed, 0);
+        assert_eq!(f, before);
+    }
+    #[test]
+    fn at_bindings_are_unambiguous_in_default_mode() {
+        let mut f: ItemFn =
+            syn::parse_str("fn f(value: i32) -> i32 { match value { n @ 1..=9 => n, _ => 0 } }")
+                .unwrap();
+        let out = transform(&f.sig, &mut f.block, 1);
+        assert_eq!(out.renamed, 1);
+        assert!(out.skipped.is_none());
+    }
+    #[test]
+    fn pattern_attributes_reject_the_whole_function_without_edits() {
+        let original: ItemFn = syn::parse_str("fn f(p: Point) { let mut n = 1; let Point { #[cfg(feature = \"x\")] x, .. } = p; n += 1; }").unwrap();
+        let mut f = original.clone();
+        assert!(transform_with_options(&f.sig, &mut f.block, 1, true)
+            .skipped
+            .is_some());
+        assert_eq!(f, original);
     }
 }

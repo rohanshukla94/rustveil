@@ -1,0 +1,5 @@
+error: duplicate obfuscate option
+ --> tests/ui/duplicate_option.rs:3:23
+  |
+3 | #[obfuscate(seed = 1, seed = 2)]
+  |                       ^^^^^^^^

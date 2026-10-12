@@ -5,6 +5,8 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "Opt-in procedural macros for Rust source and string obfuscation"
 readme = "README.md"
 

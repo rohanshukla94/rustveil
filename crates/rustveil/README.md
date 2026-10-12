@@ -31,3 +31,14 @@ fn label() -> &'static str {
 This is reversible obfuscation, not encryption. A seed is not a secret, and
 the macros do not guarantee semantic equivalence or protect embedded secrets.
 See the project repository for supported syntax, costs, and validation details.
+
+Use `#[obfuscate(require_renames)]` to fail compilation when obfuscation is
+enabled but a function is skipped or no bindings are renamed. `strict` rejects
+skipped functions only. Options are validated even with obfuscation disabled;
+duplicate options are rejected.
+
+Tuple, struct, slice, reference, and `@` patterns and match guards are supported.
+In `assume_bindings` mode, bare identifier patterns must be variable bindings.
+Qualify constants and unit variants, for example `crate::LIMIT` and
+`Option::None`, to keep their meaning. Macros, or-patterns, conditional let
+patterns, nested items, const blocks/patterns, and attributes are skipped.

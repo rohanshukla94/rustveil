@@ -1,0 +1,5 @@
+error: rustveil skipped function: macro tokens require expansion and name resolution
+ --> tests/ui/unsupported.rs:4:1
+  |
+4 | fn unsupported() { println!("visible"); }
+  | ^^^^^^^^^^^^^^^^

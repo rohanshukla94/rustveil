@@ -16,29 +16,45 @@ obfuscator or a guarantee against reverse engineering.
 | `workspace-app` | Working example, including a renamed dependency (`rv`) |
 
 Local renaming handles nested blocks, shadowing, initializer scope, assignments,
-simple closure and loop bindings, and struct-expression field shorthand. It
+closure and loop bindings, tuple/struct/slice/reference destructuring, `@`
+bindings, `let-else`, and match arms with guards. Struct field names are preserved
+in both expressions and patterns by expanding shorthand when needed. It
 preserves function names, function parameters, type names, struct field names,
 lifetimes, public interfaces, and serialization names. Identifier seeds are
 deterministic; they are not secrets.
 
 There are two binding modes:
 
-* **Default:** rename explicit `mut`/`ref` bindings and subsequent shadowing of
+* **Default:** rename explicit `mut`/`ref`/`@` bindings and subsequent shadowing of
   known renamed bindings. Leave ambiguous bare identifier patterns unchanged.
 * **Reviewed:** `assume_bindings` also renames ordinary immutable locals and
-  simple closure/loop parameters. You assert that these are variable bindings,
-  not unit-struct or constant patterns. Do not enable this over an unreviewed
+  closure/loop/match bindings. You assert that bare identifier patterns are
+  variable bindings, not unit structs, constants, or enum variants. Qualify
+  variants and constants (for example, `Option::None` and `crate::LIMIT`)
+  before enabling this mode. Do not enable this over an unreviewed
   workspace. A successful compile alone cannot prove equivalent behavior.
 
 Rust allows `let Unit = value;` to be a pattern, rather than a variable binding.
 A syntax parser cannot fully resolve that distinction. Both modes skip entire
-functions containing macros, match expressions, conditional let patterns,
-destructuring patterns, nested items, inline const blocks, or body/signature
+functions containing macros, or-patterns, conditional let patterns,
+nested items, const patterns, inline const blocks, or body/signature
 attributes. The CLI also skips attributed functions, modules, impls, traits,
 and files. This includes harmless documentation and lint attributes: coverage
 is intentionally conservative. Skips are visible in the CLI report; macro
 `strict` mode turns a skip into a compiler error. `strict` does not require that
-at least one identifier was renamed.
+at least one identifier was renamed. Use `#[obfuscate(require_renames)]` to
+reject both skipped functions and functions with no renamed bindings. These
+checks apply only with the `enabled` feature; option syntax is always validated.
+
+## Install from crates.io
+
+```sh
+cargo add rustveil@0.1
+cargo install rustveil-cli --locked
+```
+
+The library's `enabled` feature is opt-in. See the integration example below.
+The design assessment and next milestones are in [ROADMAP.md](ROADMAP.md).
 
 ## Try the workspace example
 
@@ -168,6 +184,12 @@ cargo test --manifest-path /projects/my-app-obfuscated/Cargo.toml --workspace
 ```
 
 The CLI writes its report to stdout and `.rustveil-report.json` inside the copy.
+Report format 2 includes `selected_files`, `transformed_files`, `renamed`, and
+`skipped_entries`. A skipped entry can represent an entire attributed module,
+impl, trait, or file, so it is not a count of skipped functions.
+Use `--min-renamed 1` to reject empty selections and runs that rename nothing.
+Use `--fail-on-skip` when every selected entry must be supported. Both checks
+also apply to `--dry-run`; failures exit nonzero and do not publish an output.
 The report records file paths, function names, rename counts, and skip reasons;
 it is an internal build artifact, not something to ship to customers. It does
 not contain an original-to-renamed variable map. Default exclusions are `.git`,

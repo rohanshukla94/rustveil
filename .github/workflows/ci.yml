@@ -1,14 +1,33 @@
 name: rustveil
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: ["1.88.0", stable]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: rustup toolchain install ${{ matrix.rust }} --profile minimal
+      - run: rustup default ${{ matrix.rust }}
+      - run: cargo test --workspace --locked
+      - run: cargo test --workspace --all-features --locked
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: python scripts/check_release.py
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install tested toolchain
-        run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt,clippy
-      - run: cargo +1.99.0 fmt --all -- --check
-      - run: cargo +1.99.0 test --workspace --locked
-      - run: cargo +1.99.0 test --workspace --all-features --locked
-      - run: cargo +1.99.0 clippy --workspace --all-targets --all-features --locked -- -D warnings
-      - run: cargo +1.99.0 run -p workspace-app --release --features obfuscation --locked
+      - run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
+      - run: cargo +stable fmt --all -- --check
+      - run: cargo +stable clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - run: cargo +stable doc --workspace --all-features --no-deps --locked
+        env:
+          RUSTDOCFLAGS: -D warnings
